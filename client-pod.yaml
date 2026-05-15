@@ -1,9 +1,11 @@
+# Defines a Pod — the smallest deployable unit in Kubernetes
+# This Pod runs a single React container (multi-client) on port 3000
 apiVersion: v1
 kind: Pod
 metadata:
   name: client-pod
   labels:
-    component: web
+    component: web # Used by the NodePort Service selector to route traffic to this Pod
 spec:
   containers:
     - name: client

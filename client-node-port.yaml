@@ -1,12 +1,14 @@
+# Defines a NodePort Service — exposes the Pod to external traffic
+# Flow: Browser :31515 → Service :3050 → Pod :3000 → Container
 apiVersion: v1
 kind: Service
 metadata:
   name: client-node-port
 spec:
-  type: NodePort
+  type: NodePort # Allows access from outside the cluster (range: 30000-32767)
   ports:
-    - port: 3050
-      targetPort: 3000
-      nodePort: 31515
+    - port: 3050       # Internal cluster port (used by other Pods to reach this Service)
+      targetPort: 3000 # Must match containerPort in client-pod.yaml
+      nodePort: 31515  # External port — accessible via localhost:31515
   selector:
-    component: web
+    component: web # Routes traffic to all Pods with label "component: web"
