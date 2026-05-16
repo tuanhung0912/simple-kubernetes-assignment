@@ -1,6 +1,6 @@
 # ☸️ Simple Kubernetes Assignment
 
-> A hands-on project demonstrating how to deploy a web application on Kubernetes using **Pod** and **NodePort Service** configurations.
+> A hands-on project demonstrating how to deploy a web application on Kubernetes using **Pod**, **Deployment**, and **NodePort Service** configurations.
 
 ---
 
@@ -11,7 +11,8 @@
 - [Project Structure](#-project-structure)
 - [Configuration Details](#-configuration-details)
   - [Client Pod](#1-client-pod-client-podyaml)
-  - [Client NodePort Service](#2-client-nodeport-service-client-node-portyaml)
+  - [Client Deployment](#2-client-deployment-client-deploymentyaml)
+  - [Client NodePort Service](#3-client-nodeport-service-client-node-portyaml)
 - [Prerequisites](#-prerequisites)
 - [Deployment Guide](#-deployment-guide)
 - [Access & Verification](#-access--verification)
@@ -28,6 +29,7 @@ This project illustrates how to deploy a web client application on **Kubernetes*
 | Component | Description |
 |---|---|
 | **Pod** | The smallest deployable unit in K8s, running the `multi-client` container |
+| **Deployment** | A higher-level controller that manages Pod replicas, rolling updates, and self-healing |
 | **NodePort Service** | Exposes the application outside the cluster through a specific port on each Node |
 
 The application uses the `stephengrider/multi-client` Docker image — a React client application running on port `3000`.
@@ -37,23 +39,26 @@ The application uses the `stephengrider/multi-client` Docker image — a React c
 ## 🏗 System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Kubernetes Cluster                    │
-│                                                         │
-│  ┌─────────────────────┐    ┌────────────────────────┐  │
-│  │   NodePort Service   │    │       Pod: client-pod  │  │
-│  │  (client-node-port)  │───▶│                        │  │
-│  │                      │    │  ┌──────────────────┐  │  │
-│  │  port: 3050          │    │  │   Container:     │  │  │
-│  │  targetPort: 3000    │    │  │   multi-client   │  │  │
-│  │  nodePort: 31515     │    │  │   Port: 3000     │  │  │
-│  │                      │    │  └──────────────────┘  │  │
-│  │  selector:           │    │                        │  │
-│  │    component: web    │────│  labels:               │  │
-│  │                      │    │    component: web      │  │
-│  └─────────────────────┘    └────────────────────────┘  │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Kubernetes Cluster                            │
+│                                                                      │
+│  ┌─────────────────────┐    ┌──────────────────────────────────────┐ │
+│  │   NodePort Service   │    │      Deployment: client-deployment  │ │
+│  │  (client-node-port)  │    │          (replicas: 1)              │ │
+│  │                      │    │                                      │ │
+│  │  port: 3050          │    │  ┌────────────────────────────────┐ │ │
+│  │  targetPort: 3000    │───▶│  │     Pod (managed by Deployment)│ │ │
+│  │  nodePort: 31515     │    │  │                                │ │ │
+│  │                      │    │  │  ┌──────────────────────────┐  │ │ │
+│  │  selector:           │    │  │  │  Container: client       │  │ │ │
+│  │    component: web    │────│  │  │  image: multi-client     │  │ │ │
+│  │                      │    │  │  │  Port: 3000              │  │ │ │
+│  └─────────────────────┘    │  │  └──────────────────────────┘  │ │ │
+│                              │  │  labels: component: web       │ │ │
+│                              │  └────────────────────────────────┘ │ │
+│                              └──────────────────────────────────────┘ │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
           ▲
           │ Port 31515
           │
@@ -79,6 +84,7 @@ The application uses the `stephengrider/multi-client` Docker image — a React c
 ```
 simplek8s/
 ├── client-pod.yaml          # Pod configuration for the client application
+├── client-deployment.yaml   # Deployment configuration (manages Pods with rolling updates)
 ├── client-node-port.yaml    # NodePort Service configuration to expose the app
 └── README.md                # Project documentation (this file)
 ```
@@ -116,7 +122,55 @@ spec:
 
 ---
 
-### 2. Client NodePort Service (`client-node-port.yaml`)
+### 2. Client Deployment (`client-deployment.yaml`)
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: web
+  template:
+    metadata:
+      labels:
+        component: web
+    spec:
+      containers:
+        - name: client
+          image: stephengrider/multi-client
+          ports:
+            - containerPort: 3000
+```
+
+| Field | Value | Description |
+|---|---|---|
+| `apiVersion` | `apps/v1` | API group for Deployment resources |
+| `kind` | `Deployment` | Resource type — manages ReplicaSets and Pods |
+| `metadata.name` | `client-deployment` | Unique identifier for the Deployment |
+| `spec.replicas` | `1` | Number of Pod replicas to maintain |
+| `spec.selector.matchLabels` | `component: web` | Selector to identify which Pods this Deployment manages |
+| `spec.template.metadata.labels` | `component: web` | Labels applied to Pods created by this Deployment |
+| `spec.template.spec.containers[0].name` | `client` | Name of the container inside the Pod |
+| `spec.template.spec.containers[0].image` | `stephengrider/multi-client` | Docker image pulled from Docker Hub |
+| `spec.template.spec.containers[0].ports[0].containerPort` | `3000` | The port the React application listens on |
+
+#### 🔄 Deployment vs Pod — Key Differences:
+
+| Feature | Pod (`client-pod.yaml`) | Deployment (`client-deployment.yaml`) |
+|---|---|---|
+| **Self-healing** | ❌ If deleted, it's gone | ✅ Automatically recreates Pods |
+| **Rolling updates** | ❌ Must delete and recreate manually | ✅ Updates with zero downtime |
+| **Scaling** | ❌ Single instance only | ✅ Scale with `replicas` field |
+| **Rollback** | ❌ No version history | ✅ Rollback to previous versions |
+| **Production use** | ⚠️ Learning/testing only | ✅ Recommended for production |
+
+---
+
+### 3. Client NodePort Service (`client-node-port.yaml`)
 
 ```yaml
 apiVersion: v1
@@ -200,8 +254,20 @@ minikube start
 
 ### Step 3: Apply Kubernetes configurations
 
+**Option A** — Using Deployment (recommended):
+
 ```bash
-# Deploy the Pod
+# Deploy the Deployment (manages Pods automatically)
+kubectl apply -f client-deployment.yaml
+
+# Deploy the Service
+kubectl apply -f client-node-port.yaml
+```
+
+**Option B** — Using standalone Pod (for learning):
+
+```bash
+# Deploy the Pod directly
 kubectl apply -f client-pod.yaml
 
 # Deploy the Service
@@ -217,6 +283,9 @@ kubectl apply -f .
 ### Step 4: Verify deployment status
 
 ```bash
+# Check Deployment status
+kubectl get deployments
+
 # Check Pod status
 kubectl get pods
 
@@ -227,8 +296,8 @@ kubectl get services
 Wait until the Pod status shows **Running**:
 
 ```
-NAME         READY   STATUS    RESTARTS   AGE
-client-pod   1/1     Running   0          30s
+NAME                                 READY   STATUS    RESTARTS   AGE
+client-deployment-7d4b8f6c9f-x2k5p   1/1     Running   0          30s
 ```
 
 ---
@@ -257,6 +326,34 @@ minikube service client-node-port
 ---
 
 ## 📝 Useful Kubernetes Commands
+
+### Deployment Management
+
+```bash
+# List all Deployments
+kubectl get deployments
+
+# View detailed Deployment information
+kubectl describe deployment client-deployment
+
+# Scale the Deployment (e.g., to 3 replicas)
+kubectl scale deployment client-deployment --replicas=3
+
+# Update the image (triggers a rolling update)
+kubectl set image deployment/client-deployment client=stephengrider/multi-client:v2
+
+# Check rollout status
+kubectl rollout status deployment/client-deployment
+
+# Rollback to the previous version
+kubectl rollout undo deployment/client-deployment
+
+# View rollout history
+kubectl rollout history deployment/client-deployment
+
+# Delete the Deployment
+kubectl delete deployment client-deployment
+```
 
 ### Pod Management
 
@@ -331,6 +428,14 @@ kubectl get events --sort-by='.lastTimestamp'
 | **NodePort** | Opens a port on each Node (range: 30000–32767) | External access |
 | **LoadBalancer** | Provisions a load balancer from the cloud provider | Public / Internet |
 | **ExternalName** | Maps the service to an external DNS name | DNS redirect |
+
+### What is a Deployment?
+
+- A **higher-level controller** that manages Pods through ReplicaSets
+- Ensures the **desired number of replicas** are always running
+- Supports **rolling updates** — update containers with zero downtime
+- Provides **rollback** capability to revert to a previous version
+- Pods created by a Deployment are **automatically recreated** if they crash or get deleted
 
 ### Why Do We Need Services?
 
