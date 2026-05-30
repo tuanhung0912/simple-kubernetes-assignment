@@ -7,7 +7,6 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
-- [System Architecture](#-system-architecture)
 - [Project Structure](#-project-structure)
 - [Configuration Details](#-configuration-details)
   - [Client Pod](#1-client-pod-client-podyaml)
@@ -33,49 +32,6 @@ This project illustrates how to deploy a web client application on **Kubernetes*
 | **NodePort Service** | Exposes the application outside the cluster through a specific port on each Node |
 
 The application uses the `stephengrider/multi-client` Docker image — a React client application running on port `3000`.
-
----
-
-## 🏗 System Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        Kubernetes Cluster                            │
-│                                                                      │
-│  ┌─────────────────────┐    ┌──────────────────────────────────────┐ │
-│  │   NodePort Service   │    │      Deployment: client-deployment  │ │
-│  │  (client-node-port)  │    │          (replicas: 1)              │ │
-│  │                      │    │                                      │ │
-│  │  port: 3050          │    │  ┌────────────────────────────────┐ │ │
-│  │  targetPort: 3000    │───▶│  │     Pod (managed by Deployment)│ │ │
-│  │  nodePort: 31515     │    │  │                                │ │ │
-│  │                      │    │  │  ┌──────────────────────────┐  │ │ │
-│  │  selector:           │    │  │  │  Container: client       │  │ │ │
-│  │    component: web    │────│  │  │  image: multi-client     │  │ │ │
-│  │                      │    │  │  │  Port: 3000              │  │ │ │
-│  └─────────────────────┘    │  │  └──────────────────────────┘  │ │ │
-│                              │  │  labels: component: web       │ │ │
-│                              │  └────────────────────────────────┘ │ │
-│                              └──────────────────────────────────────┘ │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
-          ▲
-          │ Port 31515
-          │
-    ┌─────┴─────┐
-    │  Browser   │
-    │ localhost  │
-    │  :31515    │
-    └───────────┘
-```
-
-### Request Flow:
-
-1. **Browser** sends a request to `localhost:31515`
-2. **NodePort Service** receives the request at `nodePort: 31515`
-3. Service forwards it to `port: 3050` (the internal ClusterIP port)
-4. Service routes traffic to `targetPort: 3000` on the Pod matching label `component: web`
-5. The **Container** (`multi-client`) inside the Pod handles the request and returns a response
 
 ---
 
