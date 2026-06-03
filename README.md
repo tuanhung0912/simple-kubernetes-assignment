@@ -401,12 +401,6 @@ kubectl get events --sort-by='.lastTimestamp'
 
 ---
 
-## 👤 Author
-
-**Tuanhung0912** — [GitHub Profile](https://github.com/Tuanhung0912)
-
----
-
 <p align="center">
   <i>📘 This project was created as part of the Docker & Kubernetes learning journey</i>
 </p>
